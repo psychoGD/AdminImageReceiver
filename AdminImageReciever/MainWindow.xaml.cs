@@ -16,9 +16,9 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
-
 using System.IO;
 using System.Drawing;
+using System.Threading;
 
 namespace AdminImageReciever
 {
@@ -38,7 +38,7 @@ namespace AdminImageReciever
             set
             {
                 _imagesFromUsers = value;
-                BindingOperations.EnableCollectionSynchronization(_imagesFromUsers,_locker);
+                BindingOperations.EnableCollectionSynchronization(_imagesFromUsers, _locker);
             }
         }
 
@@ -51,14 +51,19 @@ namespace AdminImageReciever
             {
                 ServerStart();
             });
-            
+            //Thread thread = new Thread(() =>
+            //{
+            //    ServerStart();
+            //});
+            //thread.Start();
+
         }
         public Image byteArrayToImage(byte[] bytesArr)
         {
             using (MemoryStream memstr = new MemoryStream(bytesArr))
             {
                 Image img = Image.FromStream(memstr);
-                
+
                 return img;
             }
         }
@@ -66,29 +71,47 @@ namespace AdminImageReciever
         {
             var ipAddress = IPAddress.Parse("192.168.56.1");
             var port = 80;
-            using(var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+            using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
             {
                 var ep = new IPEndPoint(ipAddress, port);
                 socket.Bind(ep);
-                socket.Listen(10);
+                socket.Listen(1000);
                 MessageBox.Show("Server Is Running");
                 while (true)
                 {
-                    var client = socket.AcceptAsync().Result;
+                    var client = socket.Accept();
+
+                    MessageBox.Show(client.RemoteEndPoint.ToString());
+
                     Task.Run(() =>
                     {
-                        var length = 0;
-                        var bytes = new byte[50000];
+                        MessageBox.Show("Image Is Coming");
+
+                        var bytes = new byte[1000000];
                         do
                         {
-                            length = client.Receive(bytes);
+                            client.Receive(bytes);
                             //MessageBox.Show(length.ToString());
                             //Image x = byteArrayToImage(bytes);
+
                             using (var ms = new MemoryStream(bytes))
                             {
                                 var image = Image.FromStream(ms);
+                                MessageBox.Show("Image has been received");
+                                string path = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                                var filename = path + $"\\{client.RemoteEndPoint}+{Guid.NewGuid()}";
+                                MessageBox.Show(filename);
+                                try
+                                {
+                                    image.Save(path);
+                                }
+                                catch (Exception)
+                                {
+                                }
+                                
                                 ImagesFromUsers.Add(image);
                             }
+
                         } while (true);
                     });
                 }
